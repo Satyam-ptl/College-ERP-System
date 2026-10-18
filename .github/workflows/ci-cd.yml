@@ -1,0 +1,25 @@
+
+name: College ERP CI Pipeline
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify dashboard exists
+        run: test -f index.html
+
+      - name: Validate HTML file is not empty
+        run: test -s index.html
+
+      - name: Display validation result
+        run: echo "College ERP dashboard validation passed"
