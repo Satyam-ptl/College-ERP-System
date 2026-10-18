@@ -1,5 +1,5 @@
 
-name: College ERP CI Pipeline
+name: College ERP CI/CD Pipeline
 
 on:
   push:
@@ -7,8 +7,14 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
-  validate:
+  build-test-package:
+    name: Build, Test and Package
     runs-on: ubuntu-latest
 
     steps:
@@ -18,8 +24,60 @@ jobs:
       - name: Verify dashboard exists
         run: test -f index.html
 
-      - name: Validate HTML file is not empty
-        run: test -s index.html
+      - name: Test HTML structure
+        run: |
+          python - <<'PY'
+          from pathlib import Path
 
-      - name: Display validation result
-        run: echo "College ERP dashboard validation passed"
+          html = Path("index.html").read_text(encoding="utf-8")
+          content = html.lower()
+
+          required = [
+              "<!doctype html",
+              "<html",
+              "<head",
+              "<title",
+              "<body",
+          ]
+
+          missing = [tag for tag in required if tag not in content]
+
+          if missing:
+              raise SystemExit(f"HTML validation failed: {missing}")
+
+          if not html.strip():
+              raise SystemExit("HTML file is empty")
+
+          print("HTML structure validation passed")
+          PY
+
+      - name: Prepare deployment package
+        run: |
+          mkdir public
+          cp index.html public/index.html
+          test -s public/index.html
+
+      - name: Configure GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v5
+
+      - name: Upload website package
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    name: Deploy College ERP
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-test-package
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
